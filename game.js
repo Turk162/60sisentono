@@ -111,13 +111,25 @@ function spriteOmino(w, h, scala, mezzoTorso, busto, extra) {
 }
 
 const SPRITE_OSTACOLI = [
-  // 0: tifoso juventino (maglia a strisce bianconere)
-  spriteOmino(64, 80, 1.25, 14, g => {
-    g.fillStyle = '#f5f0e8';
-    g.fillRect(-14, 16, 28, 30);
-    g.fillStyle = '#111';
-    for (let x = -14; x < 14; x += 8) g.fillRect(x, 16, 4, 30);
-  }),
+  // 0: tifoso juventino (maglia a strisce bianconere con lo scudetto)
+  (() => {
+    const s = spriteOmino(70, 80, 1.3, 22, g => {
+      g.fillStyle = '#f5f0e8';                      // maglia bianca
+      g.beginPath(); g.roundRect(-22, 16, 44, 32, 4); g.fill();
+      g.fillStyle = '#111';                         // strisce nere
+      for (let x = -22; x < 22; x += 9) g.fillRect(x, 16, 4.5, 32);
+    });
+    const logo = new Image();
+    logo.onload = () => {
+      const g = s.getContext('2d');
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      g.setTransform(dpr * 1.3, 0, 0, dpr * 1.3, 0, 0);
+      g.translate(35, 8);                           // stesso sistema di spriteOmino
+      g.drawImage(logo, -11, 17, 22, 30);           // scudetto al centro del petto
+    };
+    logo.src = 'juve_scudetto.png';
+    return s;
+  })(),
   // 1: Duomo di Milano con la Madonnina e la scritta
   nuovoSprite(140, 104, g => {
     g.translate(70, 0);
@@ -216,7 +228,7 @@ const SPRITE_OSTACOLI = [
 ];
 
 // Raggio di collisione per tipo di ostacolo
-const RAGGI_OSTACOLI = [26, 30, 26, 28, 28, 28, 36];
+const RAGGI_OSTACOLI = [28, 30, 26, 28, 28, 28, 36];
 
 // Power-up pizza: tipo -> simbolo del distintivo
 const PIZZE = { turbo: '⚡', vita: '❤️', scudo: '🛡️' };
