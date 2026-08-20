@@ -1,0 +1,145 @@
+/* Regalo Rino — layout mobile-first, anti-scroll iOS */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: #1a1a1a;
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#gioco {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  touch-action: none;
+  display: block;
+}
+
+/* Overlay a schermo intero */
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 15, 15, 0.88);
+  padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 16px);
+  z-index: 10;
+}
+.overlay.trasparente { background: transparent; pointer-events: none; flex-direction: column; }
+.nascosto { display: none !important; }
+.invisibile { opacity: 0; }
+
+.pannello {
+  text-align: center;
+  color: #f5f0e8;
+  max-width: 420px;
+  width: 100%;
+}
+
+.sopratitolo {
+  font-size: 0.75rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #b8b0a4;
+}
+
+h1 {
+  font-size: 2.2rem;
+  font-weight: 800;
+  font-style: italic;
+  margin: 0.4em 0 0.2em;
+  line-height: 1.1;
+}
+
+.pista {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: 0.25em;
+  color: #d32f2f;
+  margin-bottom: 1em;
+}
+
+.istruzioni {
+  font-size: 1.05rem;
+  line-height: 1.5;
+  margin-bottom: 1.6em;
+}
+
+button {
+  font: inherit;
+  font-size: 1.4rem;
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: 0.05em;
+  color: #fff;
+  background: #d32f2f;
+  border: none;
+  border-radius: 999px;
+  padding: 0.7em 2.2em;
+  box-shadow: 0 4px 14px rgba(211, 47, 47, 0.45);
+  cursor: pointer;
+}
+button:active { transform: scale(0.95); }
+button.secondario {
+  font-size: 1rem;
+  background: transparent;
+  border: 2px solid #b8b0a4;
+  box-shadow: none;
+  margin-top: 1.4em;
+}
+
+/* Semaforo */
+#luci {
+  display: flex;
+  gap: 18px;
+  background: #111;
+  border-radius: 16px;
+  padding: 18px 24px;
+}
+.luce {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #3a3a3a;
+  transition: background 0.15s;
+}
+.luce.accesa { background: #e53935; box-shadow: 0 0 18px #e53935; }
+#via {
+  font-size: 3rem;
+  font-weight: 800;
+  font-style: italic;
+  color: #4caf50;
+  text-shadow: 0 0 20px rgba(76, 175, 80, 0.7);
+  margin-top: 0.4em;
+}
+
+/* Schermata premio */
+#bandiera { font-size: 3rem; }
+#auguri, #premio, #sottotitolo, #btnRigioca { transition: opacity 0.6s, transform 0.6s; }
+#premio {
+  width: 100%;
+  max-width: 400px;
+  max-height: 42vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+  margin: 0.8em 0 0.6em;
+  transform: scale(0.6) rotate(-4deg);
+}
+#premio.mostrato {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+  transition: opacity 0.6s, transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.mostrato { opacity: 1; }
+#sottotitolo { font-size: 1.1rem; color: #ffd54f; font-weight: 600; }

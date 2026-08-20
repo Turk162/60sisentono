@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏍️</text></svg>">
+<title>Gran Premio d'Italia — Mugello</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="gioco"></canvas>
+
+<!-- Schermata iniziale -->
+<div id="start" class="overlay">
+  <div class="pannello">
+    <p class="sopratitolo">Campionato del Mondo di Motociclismo</p>
+    <h1>Gran Premio<br>d'Italia 🏁</h1>
+    <p class="pista">MUGELLO</p>
+    <p class="istruzioni">Trascina il dito per sterzare.<br>Occhio alle pizze margherita! 🍕</p>
+    <button id="btnParti">PARTI!</button>
+  </div>
+</div>
+
+<!-- Semaforo di partenza -->
+<div id="semaforo" class="overlay nascosto trasparente">
+  <div id="luci">
+    <span class="luce"></span><span class="luce"></span><span class="luce"></span>
+  </div>
+  <p id="via" class="nascosto">VIA!</p>
+</div>
+
+<!-- Schermata premio -->
+<div id="finish" class="overlay nascosto">
+  <div class="pannello">
+    <p id="bandiera">🏁</p>
+    <h1 id="auguri" class="invisibile">Buon compleanno<br>Rino! 🎉</h1>
+    <img id="premio" class="invisibile" src="biglietti.jpg" alt="Biglietti MotoGP Mugello">
+    <p id="sottotitolo" class="invisibile">Si va al Mugello davvero! 🏍️</p>
+    <button id="btnRigioca" class="invisibile secondario">Rigioca</button>
+  </div>
+</div>
+
+<!-- Avviso orientamento -->
+<div id="ruota" class="overlay nascosto">
+  <div class="pannello"><p class="istruzioni">Ruota il telefono in verticale 🔄</p></div>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>
