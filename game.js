@@ -135,20 +135,26 @@ const SPRITE_OSTACOLI = [
     g.fillStyle = '#8a8478';                        // portone e rosone
     g.beginPath(); g.arc(0, 58, 7, 3.14, 0); g.fill(); g.fillRect(-7, 58, 14, 14);
   }),
-  // 2: bandiera della Lega Lombarda (sole delle Alpi)
-  nuovoSprite(64, 84, g => {
-    g.translate(10, 0);
-    g.fillStyle = '#7a7a7a';                        // asta
-    g.fillRect(-2, 4, 4, 76);
-    g.fillStyle = '#1b8a3a';                        // drappo
-    g.beginPath(); g.roundRect(2, 6, 48, 34, 3); g.fill();
-    g.fillStyle = '#f5f0e8';                        // sole delle Alpi
-    for (let i = 0; i < 6; i++) {
-      const a = i * Math.PI / 3;
-      g.beginPath(); g.ellipse(26 + Math.cos(a) * 8, 23 + Math.sin(a) * 8, 4.5, 3, a, 0, 7); g.fill();
-    }
-    g.beginPath(); g.arc(26, 23, 3.5, 0, 7); g.fill();
-  }),
+  // 2: bandiera della Lega (logo caricato da lega_logo.jpg)
+  (() => {
+    const s = nuovoSprite(72, 88, g => {
+      g.translate(8, 0);
+      g.fillStyle = '#7a7a7a';                      // asta
+      g.fillRect(-2, 4, 4, 80);
+      g.fillStyle = '#fff';                         // drappo bianco
+      g.strokeStyle = '#1a3f8f'; g.lineWidth = 2;
+      g.beginPath(); g.roundRect(2, 6, 56, 42, 3); g.fill(); g.stroke();
+    });
+    const logo = new Image();
+    logo.onload = () => {
+      const g = s.getContext('2d');
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      g.drawImage(logo, 20, 8, 38, 38);             // centrato nel drappo
+    };
+    logo.src = 'lega_logo.jpg';
+    return s;
+  })(),
   // 3: omino col cartello "SALVINI"
   spriteOmino(72, 108, g => {
     g.fillStyle = '#3f6d3a';                        // felpa verde
