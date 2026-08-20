@@ -111,25 +111,13 @@ function spriteOmino(w, h, scala, mezzoTorso, busto, extra) {
 }
 
 const SPRITE_OSTACOLI = [
-  // 0: tifoso juventino (maglia a strisce bianconere con lo scudetto)
-  (() => {
-    const s = spriteOmino(70, 80, 1.3, 22, g => {
-      g.fillStyle = '#f5f0e8';                      // maglia bianca
-      g.beginPath(); g.roundRect(-22, 16, 44, 32, 4); g.fill();
-      g.fillStyle = '#111';                         // strisce nere
-      for (let x = -22; x < 22; x += 9) g.fillRect(x, 16, 4.5, 32);
-    });
-    const logo = new Image();
-    logo.onload = () => {
-      const g = s.getContext('2d');
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      g.setTransform(dpr * 1.3, 0, 0, dpr * 1.3, 0, 0);
-      g.translate(35, 8);                           // stesso sistema di spriteOmino
-      g.drawImage(logo, -11, 17, 22, 30);           // scudetto al centro del petto
-    };
-    logo.src = 'juve_scudetto.png';
-    return s;
-  })(),
+  // 0: tifoso juventino (maglia a strisce bianconere, scudetto sovrapposto nel loop)
+  spriteOmino(70, 80, 1.3, 22, g => {
+    g.fillStyle = '#f5f0e8';                        // maglia bianca
+    g.beginPath(); g.roundRect(-22, 16, 44, 32, 4); g.fill();
+    g.fillStyle = '#111';                           // strisce nere
+    for (let x = -22; x < 22; x += 9) g.fillRect(x, 16, 4.5, 32);
+  }),
   // 1: Duomo di Milano con la Madonnina e la scritta
   nuovoSprite(140, 104, g => {
     g.translate(70, 0);
@@ -154,25 +142,14 @@ const SPRITE_OSTACOLI = [
     g.fillText('O mia bela madunina', 0, 90);
   }),
   // 2: bandiera della Lega (logo caricato da lega_logo.jpg)
-  (() => {
-    const s = nuovoSprite(72, 88, g => {
-      g.translate(8, 0);
-      g.fillStyle = '#7a7a7a';                      // asta
-      g.fillRect(-2, 4, 4, 80);
-      g.fillStyle = '#fff';                         // drappo bianco
-      g.strokeStyle = '#1a3f8f'; g.lineWidth = 2;
-      g.beginPath(); g.roundRect(2, 6, 56, 42, 3); g.fill(); g.stroke();
-    });
-    const logo = new Image();
-    logo.onload = () => {
-      const g = s.getContext('2d');
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      g.setTransform(dpr, 0, 0, dpr, 0, 0);
-      g.drawImage(logo, 20, 8, 38, 38);             // centrato nel drappo
-    };
-    logo.src = 'lega_logo.jpg';
-    return s;
-  })(),
+  nuovoSprite(72, 88, g => {
+    g.translate(8, 0);
+    g.fillStyle = '#7a7a7a';                        // asta
+    g.fillRect(-2, 4, 4, 80);
+    g.fillStyle = '#fff';                           // drappo bianco
+    g.strokeStyle = '#1a3f8f'; g.lineWidth = 2;
+    g.beginPath(); g.roundRect(2, 6, 56, 42, 3); g.fill(); g.stroke();
+  }),
   // 3: omino con la maglia verde e la scritta SALVINI
   spriteOmino(70, 80, 1.3, 22, g => {
     g.fillStyle = '#1b8a3a';                        // maglia verde
@@ -224,11 +201,31 @@ const SPRITE_OSTACOLI = [
     g.fillStyle = '#c62828';
     g.font = 'italic bold 12px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText('TRENITALIA', 67, 26);
+  }),
+  // 7: donna bionda con maglia nera e scritta MELONI
+  spriteOmino(70, 80, 1.3, 22, g => {
+    g.fillStyle = '#111';                           // maglia nera
+    g.beginPath(); g.roundRect(-22, 16, 44, 32, 4); g.fill();
+    g.fillStyle = '#fff';
+    g.font = 'bold 10px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('MELONI', 0, 32);
+  }, g => {
+    g.fillStyle = '#e8c86a';                        // capelli biondi
+    g.beginPath(); g.arc(0, 4, 11, 3.34, 6.08); g.fill();   // calotta
+    g.beginPath(); g.ellipse(-10, 12, 4.5, 9, 0.25, 0, 7); g.fill();  // ciocca sinistra
+    g.beginPath(); g.ellipse(10, 12, 4.5, 9, -0.25, 0, 7); g.fill();  // ciocca destra
   })
 ];
 
+// Loghi sovrapposti agli ostacoli, disegnati nel loop quando sono pronti
+function immagine(src) { const i = new Image(); i.src = src; return i; }
+const LOGHI = {
+  0: { img: immagine('juve_scudetto.png'), x: -14, y: -8, w: 28, h: 38 },   // scudetto sul petto
+  2: { img: immagine('lega_logo.jpg'), x: -12, y: -32, w: 34, h: 34 }       // logo sul drappo
+};
+
 // Raggio di collisione per tipo di ostacolo
-const RAGGI_OSTACOLI = [28, 30, 26, 28, 28, 28, 36];
+const RAGGI_OSTACOLI = [28, 30, 26, 28, 28, 28, 36, 28];
 
 // Power-up pizza: tipo -> simbolo del distintivo
 const PIZZE = { turbo: '⚡', vita: '❤️', scudo: '🛡️' };
@@ -554,6 +551,10 @@ function disegna() {
       const w = s.width / Math.min(window.devicePixelRatio || 1, 2);
       const h = s.height / Math.min(window.devicePixelRatio || 1, 2);
       ctx.drawImage(s, -w / 2, -h / 2, w, h);
+      const logo = LOGHI[o.tipo];                   // logo vero, se gia' scaricato
+      if (logo && logo.img.complete && logo.img.naturalWidth) {
+        ctx.drawImage(logo.img, logo.x, logo.y, logo.w, logo.h);
+      }
     }
     ctx.restore();
   }
