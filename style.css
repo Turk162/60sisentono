@@ -124,7 +124,7 @@ button.secondario {
 }
 
 /* Schermata premio */
-#bandiera { font-size: 3rem; }
+#bandiera, .faccione { font-size: 3rem; }
 #auguri, #premio, #sottotitolo, #btnRigioca { transition: opacity 0.6s, transform 0.6s; }
 #premio {
   width: 100%;

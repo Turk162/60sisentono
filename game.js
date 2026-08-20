@@ -1,27 +1,31 @@
-/* Gara di MotoGP per il compleanno di Rino.
-   Canvas 2D, vista dall'alto, pista a scorrimento verticale. */
+/* Gara di moto per il compleanno di Rino.
+   Canvas 2D, vista dall'alto, pista a scorrimento verticale.
+   Ostacoli satirici da schivare, pizze come power-up, 3 vite. */
 'use strict';
 
 const canvas = document.getElementById('gioco');
 const ctx = canvas.getContext('2d');
 
 // ---- Stati ----
-const S = { START: 0, COUNTDOWN: 1, RACE: 2, FINISH: 3 };
+const S = { START: 0, COUNTDOWN: 1, RACE: 2, FINISH: 3, GAMEOVER: 4 };
 let stato = S.START;
 
 // ---- Costanti di gioco (pixel CSS) ----
 const VEL_CROCIERA = 520;                    // px/s di scorrimento pista
 const DISTANZA_TOTALE = VEL_CROCIERA * 40;   // ~40 s a velocità piena
+const R_OSTACOLO = 26;
 const R_PIZZA = 30;
 const R_MOTO = 18;
 const LARGH_MOTO = 36;
+const VITE_MAX = 3;
 
 // ---- Stato di gara ----
 let W = 0, H = 0, playerY = 0, hw = 0, amp = 0;
 let dist = 0, vel = 0, fattoreVel = 1;
 let playerX = 0, targetX = 0;
 let shake = 0, tFinish = 0;
-let pizze = [], particelle = [];
+let vite = VITE_MAX, scudoT = 0, turboT = 0, invulnT = 0;
+let oggetti = [], particelle = [];
 let pausa = false;
 
 // ---- Canvas responsive con devicePixelRatio ----
@@ -92,6 +96,105 @@ const spriteMoto = nuovoSprite(LARGH_MOTO + 8, 76, g => {
   g.beginPath(); g.arc(0, 2, 8, -0.6, 0.6); g.fill();
 });
 
+// Omino generico: gambe, braccia, testa; il busto lo disegna `busto(g)`
+function spriteOmino(w, h, busto, extra) {
+  return nuovoSprite(w, h, g => {
+    g.translate(w / 2, h - 72);
+    g.fillStyle = '#2b3a55';                        // gambe
+    g.fillRect(-10, 44, 8, 24); g.fillRect(2, 44, 8, 24);
+    busto(g);                                       // busto in -14..14, 16..46
+    g.fillStyle = '#e8b88a';                        // braccia
+    g.fillRect(-20, 18, 6, 22); g.fillRect(14, 18, 6, 22);
+    g.beginPath(); g.arc(0, 6, 9, 0, 7); g.fill(); // testa
+    if (extra) extra(g);
+  });
+}
+
+const SPRITE_OSTACOLI = [
+  // 0: tifoso juventino (maglia a strisce bianconere)
+  spriteOmino(64, 88, g => {
+    g.fillStyle = '#f5f0e8';
+    g.fillRect(-14, 16, 28, 30);
+    g.fillStyle = '#111';
+    for (let x = -14; x < 14; x += 8) g.fillRect(x, 16, 4, 30);
+  }),
+  // 1: Duomo di Milano con la Madonnina
+  nuovoSprite(80, 76, g => {
+    g.translate(40, 0);
+    g.fillStyle = '#ded8cc';
+    g.beginPath();                                  // facciata a capanna
+    g.moveTo(-36, 72); g.lineTo(-36, 40); g.lineTo(0, 16); g.lineTo(36, 40); g.lineTo(36, 72);
+    g.closePath(); g.fill();
+    g.fillStyle = '#cfc8ba';                        // guglie
+    for (const [x, hg] of [[-30, 26], [-16, 34], [16, 34], [30, 26]]) {
+      g.beginPath(); g.moveTo(x - 3, 72); g.lineTo(x, 72 - hg - 14); g.lineTo(x + 3, 72); g.fill();
+    }
+    g.beginPath(); g.moveTo(-4, 40); g.lineTo(0, 6); g.lineTo(4, 40); g.fill(); // guglia maggiore
+    g.fillStyle = '#f2c53d';                        // Madonnina
+    g.beginPath(); g.arc(0, 5, 4, 0, 7); g.fill();
+    g.fillStyle = '#8a8478';                        // portone e rosone
+    g.beginPath(); g.arc(0, 58, 7, 3.14, 0); g.fill(); g.fillRect(-7, 58, 14, 14);
+  }),
+  // 2: bandiera della Lega Lombarda (sole delle Alpi)
+  nuovoSprite(64, 84, g => {
+    g.translate(10, 0);
+    g.fillStyle = '#7a7a7a';                        // asta
+    g.fillRect(-2, 4, 4, 76);
+    g.fillStyle = '#1b8a3a';                        // drappo
+    g.beginPath(); g.roundRect(2, 6, 48, 34, 3); g.fill();
+    g.fillStyle = '#f5f0e8';                        // sole delle Alpi
+    for (let i = 0; i < 6; i++) {
+      const a = i * Math.PI / 3;
+      g.beginPath(); g.ellipse(26 + Math.cos(a) * 8, 23 + Math.sin(a) * 8, 4.5, 3, a, 0, 7); g.fill();
+    }
+    g.beginPath(); g.arc(26, 23, 3.5, 0, 7); g.fill();
+  }),
+  // 3: omino col cartello "SALVINI"
+  spriteOmino(72, 108, g => {
+    g.fillStyle = '#3f6d3a';                        // felpa verde
+    g.fillRect(-14, 16, 28, 30);
+  }, g => {
+    g.fillStyle = '#9a7b4f';                        // paletto del cartello
+    g.fillRect(-2, -26, 4, 24);
+    g.fillStyle = '#f5f0e8';
+    g.strokeStyle = '#111'; g.lineWidth = 2;
+    g.beginPath(); g.roundRect(-30, -44, 60, 20, 3); g.fill(); g.stroke();
+    g.fillStyle = '#111';
+    g.font = 'bold 12px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('SALVINI', 0, -33);
+  }),
+  // 4: militare con la maglia di Vannacci
+  spriteOmino(72, 88, g => {
+    g.fillStyle = '#5a6b3c';                        // giacca mimetica
+    g.fillRect(-18, 16, 36, 30);
+    g.fillStyle = '#46552e';
+    for (const [x, y] of [[-14, 20], [6, 26], [-4, 38], [10, 18]]) g.fillRect(x, y, 7, 6);
+    g.fillStyle = '#f5f0e8';                        // maglietta sotto
+    g.fillRect(-12, 24, 24, 16);
+    g.fillStyle = '#111';
+    g.font = 'bold 5px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('VANNACCI', 0, 32);
+  }, g => {
+    g.fillStyle = '#46552e';                        // elmetto
+    g.beginPath(); g.arc(0, 3, 10, 3.14, 0); g.fill();
+  }),
+  // 5: cartello stradale FI-PI-LI
+  nuovoSprite(72, 84, g => {
+    g.translate(36, 0);
+    g.fillStyle = '#7a7a7a';                        // palo
+    g.fillRect(-3, 30, 6, 50);
+    g.fillStyle = '#1565c0';                        // pannello blu
+    g.strokeStyle = '#f5f0e8'; g.lineWidth = 3;
+    g.beginPath(); g.roundRect(-32, 2, 64, 32, 4); g.fill(); g.stroke();
+    g.fillStyle = '#f5f0e8';
+    g.font = 'bold 13px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('FI-PI-LI', 0, 19);
+  })
+];
+
+// Power-up pizza: tipo -> simbolo del distintivo
+const PIZZE = { turbo: '⚡', vita: '❤️', scudo: '🛡️' };
+
 // ---- Audio sintetizzato (Web Audio, nessun file) ----
 let audio = null;
 function avviaAudio() {
@@ -123,6 +226,19 @@ function suonoSplat() {
   for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
   const g = audio.c.createGain(); g.gain.value = 0.25;
   n.buffer = buf; n.connect(g).connect(audio.c.destination); n.start();
+}
+function suonoPickup() {
+  if (!audio) return;
+  [660, 990].forEach((f, i) => {
+    const o = audio.c.createOscillator();
+    const g = audio.c.createGain();
+    o.type = 'sine'; o.frequency.value = f;
+    o.connect(g).connect(audio.c.destination);
+    const t = audio.c.currentTime + i * 0.09;
+    g.gain.setValueAtTime(0.12, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+    o.start(t); o.stop(t + 0.2);
+  });
 }
 function fanfara() {
   if (!audio) return;
@@ -159,23 +275,33 @@ window.addEventListener('keydown', e => { tasti[e.key] = true; });
 window.addEventListener('keyup', e => { tasti[e.key] = false; });
 
 // ---- Preparazione gara ----
-function generaPizze() {
-  pizze = [];
+function generaOggetti() {
+  oggetti = [];
+  // Ostacoli
   let d = 900;
   while (d < DISTANZA_TOTALE - 600) {
-    const off = (Math.random() * 2 - 1) * (hw - R_PIZZA - 14);
-    pizze.push({ d, off, colpita: false });
+    const off = (Math.random() * 2 - 1) * (hw - R_OSTACOLO - 18);
+    oggetti.push({ d, off, tipo: Math.floor(Math.random() * SPRITE_OSTACOLI.length), r: R_OSTACOLO, colpito: false });
     let passo = 450 + Math.random() * 250;
     if (d > DISTANZA_TOTALE / 2) passo *= 0.85;   // densità crescente
     d += passo;
+  }
+  // Pizze power-up, lontane dagli ostacoli
+  const tipi = ['turbo', 'scudo', 'vita', 'turbo', 'scudo'];
+  let i = 0;
+  for (let dp = 1600; dp < DISTANZA_TOTALE - 800; dp += 2600 + Math.random() * 900) {
+    while (oggetti.some(o => !o.pizza && Math.abs(o.d - dp) < 200)) dp += 120;
+    const off = (Math.random() * 2 - 1) * (hw - R_PIZZA - 14);
+    oggetti.push({ d: dp, off, pizza: tipi[i++ % tipi.length], r: R_PIZZA, colpito: false });
   }
 }
 
 function avviaGara() {
   dist = 0; vel = 0; fattoreVel = 1; shake = 0;
+  vite = VITE_MAX; scudoT = 0; turboT = 0; invulnT = 0;
   playerX = targetX = centroPista(0);
   particelle = [];
-  generaPizze();
+  generaOggetti();
   stato = S.COUNTDOWN;
   // Semaforo: 3 luci rosse, poi VIA!
   const sem = document.getElementById('semaforo');
@@ -207,6 +333,11 @@ document.getElementById('btnRigioca').addEventListener('click', () => {
   avviaGara();
 });
 
+document.getElementById('btnRiprova').addEventListener('click', () => {
+  document.getElementById('gameover').classList.add('nascosto');
+  avviaGara();
+});
+
 // ---- Traguardo e premio ----
 function arrivo() {
   stato = S.FINISH;
@@ -231,16 +362,30 @@ function arrivo() {
   mostra('btnRigioca', 3400);
 }
 
+function schizzi(x, y, colori) {
+  for (let i = 0; i < 14; i++) {
+    const a = Math.random() * 6.28, v = 60 + Math.random() * 160;
+    particelle.push({
+      x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 40,
+      col: colori[i % colori.length], vita: 0.7
+    });
+  }
+}
+
 // ---- Aggiornamento ----
 function aggiorna(dt) {
   if (stato === S.RACE) {
     vel = Math.min(VEL_CROCIERA, vel + VEL_CROCIERA * dt / 2.5);  // accelerazione automatica
     fattoreVel = Math.min(1, fattoreVel + dt * 0.3);              // recupero dopo penalità
-  } else if (stato === S.FINISH) {
+  } else if (stato === S.FINISH || stato === S.GAMEOVER) {
     vel = Math.max(0, vel - VEL_CROCIERA * dt / 1.2);             // decelerazione
     tFinish += dt;
   }
-  dist += vel * fattoreVel * dt;
+  scudoT = Math.max(0, scudoT - dt);
+  turboT = Math.max(0, turboT - dt);
+  invulnT = Math.max(0, invulnT - dt);
+  const turbo = turboT > 0 ? 1.45 : 1;
+  dist += vel * fattoreVel * turbo * dt;
   if (stato === S.RACE && dist >= DISTANZA_TOTALE) arrivo();
 
   // Sterzata: la moto insegue il dito (o le frecce)
@@ -256,23 +401,34 @@ function aggiorna(dt) {
     if (playerX < c - margine) { playerX = c - margine; targetX = Math.max(targetX, playerX); fattoreVel = Math.min(fattoreVel, 0.75); }
     if (playerX > c + margine) { playerX = c + margine; targetX = Math.min(targetX, playerX); fattoreVel = Math.min(fattoreVel, 0.75); }
 
-    // Collisione con le pizze (cerchio-cerchio, raggi generosi)
-    for (const p of pizze) {
-      if (p.colpita || Math.abs(p.d - dist) > 80) continue;
-      const dx = playerX - (centroPista(p.d) + p.off);
-      const dy = p.d - dist;
-      const rr = (R_PIZZA + R_MOTO) * 0.8;
-      if (dx * dx + dy * dy < rr * rr) {
-        p.colpita = true;
+    // Collisioni (cerchio-cerchio)
+    for (const o of oggetti) {
+      if (o.colpito || Math.abs(o.d - dist) > 90) continue;
+      const dx = playerX - (centroPista(o.d) + o.off);
+      const dy = o.d - dist;
+      const rr = (o.r + R_MOTO) * (o.pizza ? 0.95 : 0.8);
+      if (dx * dx + dy * dy >= rr * rr) continue;
+      o.colpito = true;
+      if (o.pizza) {                                // power-up!
+        suonoPickup();
+        schizzi(playerX, playerY, ['#ffd54f', '#f5f0dc']);
+        if (o.pizza === 'turbo') turboT = 4;
+        else if (o.pizza === 'scudo') scudoT = 6;
+        else if (o.pizza === 'vita') vite = Math.min(VITE_MAX, vite + 1);
+      } else if (scudoT > 0) {                      // lo scudo spazza via l'ostacolo
+        suonoSplat();
+        schizzi(playerX + dx * 0.3, playerY, ['#42a5f5', '#f5f0e8']);
+      } else if (invulnT <= 0) {                    // botta: -1 vita
+        suonoSplat();
+        schizzi(playerX + dx * 0.3, playerY, ['#d84315', '#8a8478']);
         fattoreVel = 0.4;
         shake = 0.3;
-        suonoSplat();
-        for (let i = 0; i < 14; i++) {              // schizzi di pomodoro
-          const a = Math.random() * 6.28, v = 60 + Math.random() * 160;
-          particelle.push({
-            x: playerX + dx * 0.3, y: playerY, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 40,
-            col: i % 3 ? '#d84315' : '#f5f0dc', vita: 0.7
-          });
+        invulnT = 1.5;
+        vite--;
+        if (vite <= 0) {
+          stato = S.GAMEOVER;
+          tFinish = 0;
+          setTimeout(() => document.getElementById('gameover').classList.remove('nascosto'), 900);
         }
       }
     }
@@ -286,7 +442,7 @@ function aggiorna(dt) {
     else p.vy += 500 * dt;
   }
   particelle = particelle.filter(p => p.vita > 0 && p.y < H + 30);
-  motore(stato === S.RACE || (stato === S.FINISH && vel > 0));
+  motore(stato === S.RACE || ((stato === S.FINISH || stato === S.GAMEOVER) && vel > 0));
 }
 
 // ---- Disegno ----
@@ -325,25 +481,48 @@ function disegna() {
     }
   }
 
-  // Pizze
-  for (const p of pizze) {
-    const y = playerY - (p.d - dist);
-    if (y < -50 || y > H + 50) continue;
-    const x = centroPista(p.d) + p.off;
+  // Ostacoli e pizze
+  for (const o of oggetti) {
+    const y = playerY - (o.d - dist);
+    if (y < -70 || y > H + 70) continue;
+    const x = centroPista(o.d) + o.off;
     ctx.save();
     ctx.translate(x, y);
-    if (p.colpita) { ctx.globalAlpha = 0.55; ctx.scale(1.25, 0.7); }
-    ctx.drawImage(spritePizza, -32, -32, 64, 64);
+    if (o.colpito) { ctx.globalAlpha = 0.45; ctx.rotate(0.5); ctx.scale(1.1, 0.7); }
+    if (o.pizza) {
+      ctx.drawImage(spritePizza, -32, -32, 64, 64);
+      if (!o.colpito) {                             // distintivo del power-up
+        ctx.fillStyle = '#f5f0e8';
+        ctx.beginPath(); ctx.arc(20, -20, 11, 0, 7); ctx.fill();
+        ctx.font = '13px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(PIZZE[o.pizza], 20, -19);
+      }
+    } else {
+      const s = SPRITE_OSTACOLI[o.tipo];
+      const w = s.width / Math.min(window.devicePixelRatio || 1, 2);
+      const h = s.height / Math.min(window.devicePixelRatio || 1, 2);
+      ctx.drawImage(s, -w / 2, -h / 2, w, h);
+    }
     ctx.restore();
   }
 
-  // Moto con inclinazione in sterzata
+  // Moto con inclinazione in sterzata (lampeggia se invulnerabile)
   if (stato !== S.START) {
     ctx.save();
     ctx.translate(playerX, playerY);
+    if (invulnT > 0 && Math.floor(invulnT * 10) % 2) ctx.globalAlpha = 0.35;
     ctx.rotate(Math.max(-0.35, Math.min(0.35, (targetX - playerX) * 0.006)));
+    if (turboT > 0) {                               // fiammate del turbo
+      ctx.fillStyle = Math.floor(performance.now() / 60) % 2 ? '#ff9800' : '#ffd54f';
+      ctx.beginPath(); ctx.moveTo(-7, 38); ctx.lineTo(0, 38 + 16 + Math.random() * 8); ctx.lineTo(7, 38); ctx.fill();
+    }
     ctx.drawImage(spriteMoto, -(LARGH_MOTO + 8) / 2, -38, LARGH_MOTO + 8, 76);
     ctx.restore();
+    if (scudoT > 0) {                               // aura dello scudo
+      ctx.strokeStyle = `rgba(66,165,245,${0.5 + 0.3 * Math.sin(performance.now() / 120)})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(playerX, playerY, 42, 0, 7); ctx.stroke();
+    }
   }
 
   // Particelle (schizzi e coriandoli)
@@ -357,17 +536,23 @@ function disegna() {
     ctx.restore();
   }
 
-  // HUD: barra di avanzamento + velocità scenica
-  if (stato === S.RACE || stato === S.FINISH) {
-    const pad = 16, yH = 54, wB = W - pad * 2 - 90;
+  // HUD: barra di avanzamento, velocità, vite e bonus attivi
+  if (stato === S.RACE || stato === S.FINISH || stato === S.GAMEOVER) {
+    const pad = 16, yH = 54, wB = W - pad * 2 - 110;
     ctx.fillStyle = 'rgba(0,0,0,0.45)';
     ctx.beginPath(); ctx.roundRect(pad, yH, wB, 12, 6); ctx.fill();
     ctx.fillStyle = '#ffd54f';
     ctx.beginPath(); ctx.roundRect(pad, yH, Math.max(12, wB * Math.min(1, dist / DISTANZA_TOTALE)), 12, 6); ctx.fill();
     ctx.fillStyle = '#f5f0e8';
     ctx.font = 'bold 16px -apple-system, sans-serif';
-    ctx.textAlign = 'right';
-    ctx.fillText(Math.round(vel * fattoreVel * 0.6) + ' km/h', W - pad, yH + 12);
+    ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic';
+    ctx.fillText(Math.round(vel * fattoreVel * (turboT > 0 ? 1.45 : 1) * 0.6) + ' km/h', W - pad, yH + 12);
+    ctx.textAlign = 'left';
+    ctx.font = '18px sans-serif';
+    let cuori = '❤️'.repeat(vite) + '🖤'.repeat(VITE_MAX - vite);
+    if (scudoT > 0) cuori += '  🛡️';
+    if (turboT > 0) cuori += '  ⚡';
+    ctx.fillText(cuori, pad, yH + 38);
   }
   ctx.restore();
 }
@@ -381,3 +566,11 @@ function loop(t) {
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
+
+// Sonde di sola lettura per i test automatici
+window.__debug = {
+  get stato() { return stato; }, get vite() { return vite; }, get dist() { return dist; },
+  get playerX() { return playerX; }, get oggetti() { return oggetti; },
+  get scudoT() { return scudoT; }, get turboT() { return turboT; },
+  centroPista
+};
