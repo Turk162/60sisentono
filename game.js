@@ -13,7 +13,6 @@ let stato = S.START;
 // ---- Costanti di gioco (pixel CSS) ----
 const VEL_CROCIERA = 520;                    // px/s di scorrimento pista
 const DISTANZA_TOTALE = VEL_CROCIERA * 40;   // ~40 s a velocità piena
-const R_OSTACOLO = 26;
 const R_PIZZA = 30;
 const R_MOTO = 18;
 const LARGH_MOTO = 36;
@@ -97,14 +96,15 @@ const spriteMoto = nuovoSprite(LARGH_MOTO + 8, 76, g => {
 });
 
 // Omino generico: gambe, braccia, testa; il busto lo disegna `busto(g)`
-function spriteOmino(w, h, busto, extra) {
-  return nuovoSprite(w, h, g => {
+function spriteOmino(w, h, scala, mezzoTorso, busto, extra) {
+  return nuovoSprite(Math.round(w * scala), Math.round(h * scala), g => {
+    g.scale(scala, scala);
     g.translate(w / 2, h - 72);
     g.fillStyle = '#2b3a55';                        // gambe
     g.fillRect(-10, 44, 8, 24); g.fillRect(2, 44, 8, 24);
-    busto(g);                                       // busto in -14..14, 16..46
+    busto(g);                                       // busto in -mezzoTorso..mezzoTorso, 16..46
     g.fillStyle = '#e8b88a';                        // braccia
-    g.fillRect(-20, 18, 6, 22); g.fillRect(14, 18, 6, 22);
+    g.fillRect(-mezzoTorso - 6, 18, 6, 22); g.fillRect(mezzoTorso, 18, 6, 22);
     g.beginPath(); g.arc(0, 6, 9, 0, 7); g.fill(); // testa
     if (extra) extra(g);
   });
@@ -112,15 +112,15 @@ function spriteOmino(w, h, busto, extra) {
 
 const SPRITE_OSTACOLI = [
   // 0: tifoso juventino (maglia a strisce bianconere)
-  spriteOmino(64, 88, g => {
+  spriteOmino(64, 80, 1.25, 14, g => {
     g.fillStyle = '#f5f0e8';
     g.fillRect(-14, 16, 28, 30);
     g.fillStyle = '#111';
     for (let x = -14; x < 14; x += 8) g.fillRect(x, 16, 4, 30);
   }),
-  // 1: Duomo di Milano con la Madonnina
-  nuovoSprite(80, 76, g => {
-    g.translate(40, 0);
+  // 1: Duomo di Milano con la Madonnina e la scritta
+  nuovoSprite(140, 104, g => {
+    g.translate(70, 0);
     g.fillStyle = '#ded8cc';
     g.beginPath();                                  // facciata a capanna
     g.moveTo(-36, 72); g.lineTo(-36, 40); g.lineTo(0, 16); g.lineTo(36, 40); g.lineTo(36, 72);
@@ -132,8 +132,14 @@ const SPRITE_OSTACOLI = [
     g.beginPath(); g.moveTo(-4, 40); g.lineTo(0, 6); g.lineTo(4, 40); g.fill(); // guglia maggiore
     g.fillStyle = '#f2c53d';                        // Madonnina
     g.beginPath(); g.arc(0, 5, 4, 0, 7); g.fill();
-    g.fillStyle = '#8a8478';                        // portone e rosone
+    g.fillStyle = '#8a8478';                        // portone
     g.beginPath(); g.arc(0, 58, 7, 3.14, 0); g.fill(); g.fillRect(-7, 58, 14, 14);
+    g.fillStyle = '#fff';                           // targa con la scritta
+    g.strokeStyle = '#1a3f8f'; g.lineWidth = 2;
+    g.beginPath(); g.roundRect(-66, 78, 132, 22, 4); g.fill(); g.stroke();
+    g.fillStyle = '#1a3f8f';
+    g.font = 'italic bold 13px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('O mia bela madunina', 0, 90);
   }),
   // 2: bandiera della Lega (logo caricato da lega_logo.jpg)
   (() => {
@@ -155,48 +161,62 @@ const SPRITE_OSTACOLI = [
     logo.src = 'lega_logo.jpg';
     return s;
   })(),
-  // 3: omino col cartello "SALVINI"
-  spriteOmino(72, 108, g => {
-    g.fillStyle = '#3f6d3a';                        // felpa verde
-    g.fillRect(-14, 16, 28, 30);
-  }, g => {
-    g.fillStyle = '#9a7b4f';                        // paletto del cartello
-    g.fillRect(-2, -26, 4, 24);
-    g.fillStyle = '#f5f0e8';
-    g.strokeStyle = '#111'; g.lineWidth = 2;
-    g.beginPath(); g.roundRect(-30, -44, 60, 20, 3); g.fill(); g.stroke();
-    g.fillStyle = '#111';
-    g.font = 'bold 12px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText('SALVINI', 0, -33);
+  // 3: omino con la maglia verde e la scritta SALVINI
+  spriteOmino(70, 80, 1.3, 22, g => {
+    g.fillStyle = '#1b8a3a';                        // maglia verde
+    g.beginPath(); g.roundRect(-22, 16, 44, 30, 4); g.fill();
+    g.fillStyle = '#fff';
+    g.font = 'bold 10px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('SALVINI', 0, 31);
   }),
-  // 4: militare con la maglia di Vannacci
-  spriteOmino(72, 88, g => {
-    g.fillStyle = '#5a6b3c';                        // giacca mimetica
-    g.fillRect(-18, 16, 36, 30);
-    g.fillStyle = '#46552e';
-    for (const [x, y] of [[-14, 20], [6, 26], [-4, 38], [10, 18]]) g.fillRect(x, y, 7, 6);
-    g.fillStyle = '#f5f0e8';                        // maglietta sotto
-    g.fillRect(-12, 24, 24, 16);
+  // 4: omino Vannacci con la maglia arcobaleno
+  spriteOmino(82, 80, 1.3, 27, g => {
+    const colori = ['#e53935', '#ff9800', '#ffd54f', '#4caf50', '#42a5f5', '#8e5bb5'];
+    colori.forEach((c, i) => {                      // maglia arcobaleno
+      g.fillStyle = c;
+      g.fillRect(-27, 16 + i * 5, 54, 5);
+    });
+    g.strokeStyle = '#fff'; g.lineWidth = 3;
+    g.font = 'bold 10px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.strokeText('VANNACCI', 0, 31);
     g.fillStyle = '#111';
-    g.font = 'bold 5px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText('VANNACCI', 0, 32);
+    g.fillText('VANNACCI', 0, 31);
   }, g => {
     g.fillStyle = '#46552e';                        // elmetto
     g.beginPath(); g.arc(0, 3, 10, 3.14, 0); g.fill();
   }),
   // 5: cartello stradale FI-PI-LI
-  nuovoSprite(72, 84, g => {
-    g.translate(36, 0);
+  nuovoSprite(84, 92, g => {
+    g.translate(42, 0);
     g.fillStyle = '#7a7a7a';                        // palo
-    g.fillRect(-3, 30, 6, 50);
+    g.fillRect(-3, 36, 6, 52);
     g.fillStyle = '#1565c0';                        // pannello blu
     g.strokeStyle = '#f5f0e8'; g.lineWidth = 3;
-    g.beginPath(); g.roundRect(-32, 2, 64, 32, 4); g.fill(); g.stroke();
+    g.beginPath(); g.roundRect(-36, 2, 72, 36, 4); g.fill(); g.stroke();
     g.fillStyle = '#f5f0e8';
-    g.font = 'bold 13px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText('FI-PI-LI', 0, 19);
+    g.font = 'bold 16px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('FI-PI-LI', 0, 21);
+  }),
+  // 6: Frecciarossa Trenitalia
+  nuovoSprite(150, 48, g => {
+    g.fillStyle = '#d9d9de';                        // cassa
+    g.beginPath(); g.roundRect(2, 8, 132, 30, 6); g.fill();
+    g.fillStyle = '#8a1c1c';                        // muso
+    g.beginPath();
+    g.moveTo(134, 8); g.quadraticCurveTo(150, 20, 148, 38); g.lineTo(134, 38);
+    g.closePath(); g.fill();
+    g.fillStyle = '#c62828';                        // fascia rossa
+    g.fillRect(2, 32, 132, 6);
+    g.fillStyle = '#33373d';                        // finestrini
+    for (let x = 10; x < 126; x += 16) g.fillRect(x, 11, 10, 6);
+    g.fillStyle = '#c62828';
+    g.font = 'italic bold 12px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('TRENITALIA', 67, 26);
   })
 ];
+
+// Raggio di collisione per tipo di ostacolo
+const RAGGI_OSTACOLI = [26, 30, 26, 28, 28, 28, 36];
 
 // Power-up pizza: tipo -> simbolo del distintivo
 const PIZZE = { turbo: '⚡', vita: '❤️', scudo: '🛡️' };
@@ -232,6 +252,17 @@ function suonoSplat() {
   for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
   const g = audio.c.createGain(); g.gain.value = 0.25;
   n.buffer = buf; n.connect(g).connect(audio.c.destination); n.start();
+}
+function suonoBeep(freq, dur) {
+  if (!audio) return;
+  const o = audio.c.createOscillator();
+  const g = audio.c.createGain();
+  o.type = 'square'; o.frequency.value = freq;
+  o.connect(g).connect(audio.c.destination);
+  const t = audio.c.currentTime;
+  g.gain.setValueAtTime(0.12, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.start(t); o.stop(t + dur + 0.05);
 }
 function suonoPickup() {
   if (!audio) return;
@@ -286,8 +317,10 @@ function generaOggetti() {
   // Ostacoli
   let d = 900;
   while (d < DISTANZA_TOTALE - 600) {
-    const off = (Math.random() * 2 - 1) * (hw - R_OSTACOLO - 18);
-    oggetti.push({ d, off, tipo: Math.floor(Math.random() * SPRITE_OSTACOLI.length), r: R_OSTACOLO, colpito: false });
+    const tipo = Math.floor(Math.random() * SPRITE_OSTACOLI.length);
+    const r = RAGGI_OSTACOLI[tipo];
+    const off = (Math.random() * 2 - 1) * (hw - r - 18);
+    oggetti.push({ d, off, tipo, r, colpito: false });
     let passo = 450 + Math.random() * 250;
     if (d > DISTANZA_TOTALE / 2) passo *= 0.85;   // densità crescente
     d += passo;
@@ -316,10 +349,11 @@ function avviaGara() {
   sem.classList.remove('nascosto');
   via.classList.add('nascosto');
   luci.forEach(l => l.classList.remove('accesa'));
-  luci.forEach((l, i) => setTimeout(() => l.classList.add('accesa'), 500 + i * 600));
+  luci.forEach((l, i) => setTimeout(() => { l.classList.add('accesa'); suonoBeep(440, 0.18); }, 500 + i * 600));
   setTimeout(() => {
     luci.forEach(l => l.classList.remove('accesa'));
     via.classList.remove('nascosto');
+    suonoBeep(880, 0.5);
     stato = S.RACE;
     setTimeout(() => sem.classList.add('nascosto'), 700);
   }, 500 + 3 * 600 + 500);
@@ -419,7 +453,7 @@ function aggiorna(dt) {
         suonoPickup();
         schizzi(playerX, playerY, ['#ffd54f', '#f5f0dc']);
         if (o.pizza === 'turbo') turboT = 4;
-        else if (o.pizza === 'scudo') scudoT = 6;
+        else if (o.pizza === 'scudo') scudoT = 3;
         else if (o.pizza === 'vita') vite = Math.min(VITE_MAX, vite + 1);
       } else if (scudoT > 0) {                      // lo scudo spazza via l'ostacolo
         suonoSplat();
