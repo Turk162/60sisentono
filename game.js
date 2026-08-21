@@ -12,7 +12,7 @@ let stato = S.START;
 
 // ---- Costanti di gioco (pixel CSS) ----
 const VEL_CROCIERA = 520;                    // px/s di scorrimento pista
-const DISTANZA_TOTALE = VEL_CROCIERA * 40;   // ~40 s a velocità piena
+const DISTANZA_TOTALE = VEL_CROCIERA * 36;   // ~36 s a velocità piena
 const R_PIZZA = 30;
 const R_MOTO = 18;
 const LARGH_MOTO = 36;
@@ -230,7 +230,63 @@ const RAGGI_OSTACOLI = [28, 30, 26, 28, 28, 28, 36, 28];
 // Power-up pizza: tipo -> simbolo del distintivo
 const PIZZE = { turbo: '⚡', vita: '❤️', scudo: '🛡️' };
 
-// ---- Audio sintetizzato (Web Audio, nessun file) ----
+// ---- Clip vocali (mp3 in audio/, una per gruppo, a rotazione) ----
+const CLIP = {
+  juve: ['juve'],
+  milano: ['milano'],
+  salvini: ['salvini1', 'salvini2', 'salvini3'],
+  vannacci: ['vannacci'],
+  fipili: ['fipili'],
+  treni: ['treni'],
+  meloni: ['meloni1', 'meloni2', 'meloni3', 'meloni4'],
+  pizza: ['pizza1', 'pizza2', 'pizza3']
+};
+// Gruppo di clip per ogni tipo di ostacolo (stesso ordine di SPRITE_OSTACOLI)
+const GRUPPO_OSTACOLO = ['juve', 'milano', 'salvini', 'salvini', 'vannacci', 'fipili', 'treni', 'meloni'];
+
+const clipBuffer = {};   // nome file -> AudioBuffer decodificato
+const clipGiro = {};     // gruppo -> indice della prossima clip
+
+function caricaClip() {
+  if (!audio) return;
+  const nomi = new Set();
+  for (const g of Object.keys(CLIP)) for (const n of CLIP[g]) nomi.add(n);
+  for (const n of nomi) {
+    fetch('audio/' + n + '.mp3')
+      .then(r => r.arrayBuffer())
+      .then(a => new Promise((ok, ko) => audio.c.decodeAudioData(a, ok, ko)))
+      .then(b => { clipBuffer[n] = b; })
+      .catch(() => {});                            // clip mancante: resta il solo suono sintetizzato
+  }
+}
+
+let voceAttiva = null;
+// Riproduce la prossima clip del gruppo; false se non e' ancora pronta
+function voce(gruppo) {
+  const lista = CLIP[gruppo];
+  if (!audio || !lista) return false;
+  const i = clipGiro[gruppo] | 0;
+  const buf = clipBuffer[lista[i % lista.length]];
+  if (!buf) return false;
+  clipGiro[gruppo] = i + 1;
+  if (voceAttiva) { try { voceAttiva.stop(); } catch (e) {} }   // una voce alla volta
+  const s = audio.c.createBufferSource();
+  const g = audio.c.createGain();
+  g.gain.value = 0.9;
+  s.buffer = buf;
+  s.connect(g).connect(audio.c.destination);
+  s.onended = () => { if (voceAttiva === s) voceAttiva = null; };
+  s.start();
+  voceAttiva = s;
+  return true;
+}
+
+function voceOggetto(o) {
+  if (o.pizza) return voce('pizza');
+  return voce(GRUPPO_OSTACOLO[o.tipo]);
+}
+
+// ---- Audio sintetizzato (Web Audio) ----
 let audio = null;
 function avviaAudio() {
   try {
@@ -245,6 +301,7 @@ function avviaAudio() {
     osc.connect(filtro).connect(gain).connect(c.destination);
     osc.start();
     audio = { c, osc, gain };
+    caricaClip();
   } catch (e) { audio = null; }
 }
 function motore(attivo) {
@@ -460,15 +517,18 @@ function aggiorna(dt) {
       o.colpito = true;
       if (o.pizza) {                                // power-up!
         suonoPickup();
+        voceOggetto(o);
         schizzi(playerX, playerY, ['#ffd54f', '#f5f0dc']);
         if (o.pizza === 'turbo') turboT = 4;
         else if (o.pizza === 'scudo') scudoT = 3;
         else if (o.pizza === 'vita') vite = Math.min(VITE_MAX, vite + 1);
       } else if (scudoT > 0) {                      // lo scudo spazza via l'ostacolo
         suonoSplat();
+        voceOggetto(o);
         schizzi(playerX + dx * 0.3, playerY, ['#42a5f5', '#f5f0e8']);
       } else if (invulnT <= 0) {                    // botta: -1 vita
         suonoSplat();
+        voceOggetto(o);
         schizzi(playerX + dx * 0.3, playerY, ['#d84315', '#8a8478']);
         fattoreVel = 0.4;
         shake = 0.3;
@@ -625,5 +685,7 @@ window.__debug = {
   get stato() { return stato; }, get vite() { return vite; }, get dist() { return dist; },
   get playerX() { return playerX; }, get oggetti() { return oggetti; },
   get scudoT() { return scudoT; }, get turboT() { return turboT; },
+  get clipPronte() { return Object.keys(clipBuffer); },
+  get clipGiro() { return clipGiro; },
   centroPista
 };
