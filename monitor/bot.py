@@ -21,10 +21,13 @@ import sys
 import urllib.error
 import urllib.request
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import notifiche
+
+ROMA = ZoneInfo("Europe/Rome")
 
 APP = notifiche.APP
 
@@ -124,7 +127,7 @@ def processa(stato, attesa=0):
 
         # Primo collegamento: e' lui.
         stato["chat_rino"] = chat_id
-        stato["regalo_aperto_il"] = datetime.now().astimezone().isoformat(timespec="seconds")
+        stato["regalo_aperto_il"] = datetime.now(ROMA).isoformat(timespec="seconds")
         _rispondi(chat_id, benvenuto(chat.get("first_name") or "pilota"))
         nuovi += 1
 
