@@ -2,3 +2,9 @@ BIGLIETTI.png
 .playwright-mcp/
 lega.jpg
 juve_logo.png
+monitor/stato.json
+monitor/stato_prova.json
+monitor/*.tmp
+monitor/controllore.log
+__pycache__/
+monitor/.env

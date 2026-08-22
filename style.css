@@ -143,3 +143,83 @@ button.secondario {
 }
 .mostrato { opacity: 1; }
 #sottotitolo { font-size: 1.1rem; color: #ffd54f; font-weight: 600; }
+
+/* La schermata premio e' la piu' alta: se non ci sta, si scorre */
+#finish { overflow-y: auto; align-items: flex-start; }
+
+/* Riga della data: prima "da confermare", poi il timbro */
+#dataGara, #azioni { transition: opacity 0.6s; }
+#dataGara {
+  margin-top: 1em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15em;
+}
+#dataGara .etichetta {
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #b8b0a4;
+}
+#dataAttesa {
+  font-size: 1.15rem;
+  font-style: italic;
+  color: #8d8577;
+  transition: opacity 0.5s, filter 0.5s;
+}
+#dataAttesa.cancellata {
+  text-decoration: line-through;
+  opacity: 0;
+  filter: blur(3px);
+}
+#dataReale {
+  font-size: 1.5rem;
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #e53935;
+  border: 3px solid #e53935;
+  border-radius: 6px;
+  padding: 0.15em 0.5em;
+  transform: scale(2.6) rotate(-9deg);
+  opacity: 0;
+}
+#dataReale.timbrata {
+  opacity: 1;
+  transform: scale(1) rotate(-3deg);
+  transition: opacity 0.18s, transform 0.32s cubic-bezier(0.3, 1.7, 0.5, 1);
+  text-shadow: 0 0 18px rgba(229, 57, 53, 0.6);
+  box-shadow: 0 0 24px rgba(229, 57, 53, 0.35);
+}
+@keyframes scossa {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-6px, 3px); }
+  40% { transform: translate(5px, -3px); }
+  60% { transform: translate(-4px, -2px); }
+  80% { transform: translate(3px, 2px); }
+}
+.scossa { animation: scossa 0.35s; }
+
+/* Bottoncini secondari sotto il premio */
+#azioni {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6em;
+  margin-top: 1.2em;
+}
+.bottoncino {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #f5f0e8;
+  text-decoration: none;
+  background: transparent;
+  border: 2px solid #b8b0a4;
+  border-radius: 999px;
+  padding: 0.5em 1.2em;
+  white-space: nowrap;
+}
+.bottoncino:active { transform: scale(0.95); }
+#btnMuretto { border-color: #e53935; color: #ff8a80; }

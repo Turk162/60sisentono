@@ -434,8 +434,11 @@ document.getElementById('btnParti').addEventListener('click', () => {
 document.getElementById('btnRigioca').addEventListener('click', () => {
   const fin = document.getElementById('finish');
   fin.classList.add('nascosto');
-  for (const id of ['auguri', 'premio', 'sottotitolo', 'btnRigioca'])
+  for (const id of ['auguri', 'premio', 'sottotitolo', 'dataGara', 'azioni', 'btnRigioca'])
     document.getElementById(id).classList.remove('mostrato');
+  document.getElementById('dataAttesa').classList.remove('cancellata', 'nascosto');
+  document.getElementById('dataReale').classList.remove('timbrata');
+  document.getElementById('dataReale').classList.add('nascosto');
   avviaGara();
 });
 
@@ -443,6 +446,51 @@ document.getElementById('btnRiprova').addEventListener('click', () => {
   document.getElementById('gameover').classList.add('nascosto');
   avviaGara();
 });
+
+// ---- Stato della gara, pubblicato dal controllore ----
+// Se il file manca o non risponde la schermata resta com'era: "da confermare".
+let statoGara = null;
+fetch('stato_gara.json', { cache: 'no-store' })
+  .then(r => r.ok ? r.json() : null)
+  .then(d => {
+    statoGara = d;
+    const b = document.getElementById('btnMuretto');
+    if (d && d.bot) { b.href = d.bot; b.classList.remove('nascosto'); }
+  })
+  .catch(() => {});
+
+// Tonfo del timbro
+function tonfo() {
+  if (!audio) return;
+  const t = audio.c.currentTime;
+  const o = audio.c.createOscillator();
+  const g = audio.c.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(190, t);
+  o.frequency.exponentialRampToValueAtTime(38, t + 0.18);
+  g.gain.setValueAtTime(0.5, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+  o.connect(g).connect(audio.c.destination);
+  o.start(t); o.stop(t + 0.4);
+}
+
+// "da confermare" viene cancellato, poi cala il timbro con la data vera
+function timbraData() {
+  if (!statoGara || !statoGara.data_confermata || !statoGara.data_testo) return;
+  const attesa = document.getElementById('dataAttesa');
+  attesa.classList.add('cancellata');
+  setTimeout(() => {
+    attesa.classList.add('nascosto');
+    const reale = document.getElementById('dataReale');
+    reale.textContent = statoGara.data_testo;
+    reale.classList.remove('nascosto');
+    requestAnimationFrame(() => reale.classList.add('timbrata'));
+    tonfo();
+    const pannello = document.querySelector('#finish .pannello');
+    pannello.classList.add('scossa');
+    setTimeout(() => pannello.classList.remove('scossa'), 400);
+  }, 600);
+}
 
 // ---- Traguardo e premio ----
 function arrivo() {
@@ -465,7 +513,10 @@ function arrivo() {
   mostra('auguri', 1300);
   mostra('premio', 2200);
   mostra('sottotitolo', 3000);
-  mostra('btnRigioca', 3400);
+  mostra('dataGara', 3400);
+  mostra('azioni', 3900);
+  mostra('btnRigioca', 4300);
+  setTimeout(timbraData, 4400);
 }
 
 function schizzi(x, y, colori) {
