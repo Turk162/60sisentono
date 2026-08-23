@@ -479,8 +479,11 @@ fetch('stato_gara.json', { cache: 'no-store' })
   .then(r => r.ok ? r.json() : null)
   .then(d => {
     statoGara = d;
+    // Il bottone del muretto e' gia' in pagina col suo link: qui al massimo si
+    // aggiorna. Non deve dipendere da questa fetch, che se fallisce lo farebbe
+    // sparire senza un secondo tentativo.
     const b = document.getElementById('btnMuretto');
-    if (d && d.bot) { b.href = d.bot; b.classList.remove('nascosto'); }
+    if (d && d.bot) b.href = d.bot;
   })
   .catch(() => {});
 
