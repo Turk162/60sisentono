@@ -53,6 +53,12 @@ html, body {
   color: #b8b0a4;
 }
 
+.nota {
+  font-size: 0.8rem;
+  color: #b8b0a4;
+  margin-top: 1.1em;
+}
+
 h1 {
   font-size: 2.2rem;
   font-weight: 800;
