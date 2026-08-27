@@ -17,6 +17,7 @@ Due modi di funzionare:
 
 import argparse
 import json
+import time
 import sys
 import urllib.error
 import urllib.request
@@ -26,6 +27,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import notifiche
+import serratura
 
 ROMA = ZoneInfo("Europe/Rome")
 
@@ -83,28 +85,39 @@ def _chiama(metodo, parametri, timeout=60):
     return risposta.get("result")
 
 
+def _adesso():
+    return datetime.now(ROMA).strftime("%Y-%m-%d %H:%M:%S")
+
+
 def _rispondi(chat_id, testo):
     _chiama("sendMessage", {"chat_id": chat_id, "text": testo,
                             "disable_web_page_preview": True}, timeout=20)
 
 
-def processa(stato, attesa=0):
-    """Legge i messaggi arrivati al bot e reagisce ai /start.
+def scarica(offset, attesa=0):
+    """Solo rete: chiede a Telegram la coda dei messaggi, senza toccare lo stato.
+
+    Sta separata da applica() perche' l'attesa lunga dell'ascoltatore non deve
+    mai avvenire con la serratura di stato.json in mano.
+    """
+    if notifiche._vero(notifiche._config("TG_FINTO", "0")):
+        return []                     # in modalita' finta non c'e' nessuna coda da leggere
+
+    return _chiama("getUpdates", {
+        "offset": offset,
+        "timeout": attesa,
+        "allowed_updates": ["message"],
+    }, timeout=attesa + 20) or []
+
+
+def applica(aggiornamenti, stato):
+    """Reagisce ai /start gia' scaricati.
 
     `stato` e' il dizionario del controllore, modificato sul posto.
     Restituisce il numero di nuovi collegamenti. Alza ErroreInvio sui guasti.
     """
-    if notifiche._vero(notifiche._config("TG_FINTO", "0")):
-        return 0                      # in modalita' finta non c'e' nessuna coda da leggere
-
-    aggiornamenti = _chiama("getUpdates", {
-        "offset": stato.get("tg_offset", 0),
-        "timeout": attesa,
-        "allowed_updates": ["message"],
-    }, timeout=attesa + 20)
-
     nuovi = 0
-    for agg in aggiornamenti or []:
+    for agg in aggiornamenti:
         stato["tg_offset"] = agg["update_id"] + 1
         msg = agg.get("message") or {}
         testo = (msg.get("text") or "").strip()
@@ -143,6 +156,11 @@ def processa(stato, attesa=0):
     return nuovi
 
 
+def processa(stato, attesa=0):
+    """Scarica e applica in un colpo solo. Comodo per chi non ha fretta."""
+    return applica(scarica(stato.get("tg_offset", 0), attesa), stato)
+
+
 def main():
     import controllore  # importato qui: serve solo alla riga di comando
 
@@ -163,11 +181,12 @@ def main():
         return
 
     if a.dimentica:
-        stato = controllore.leggi_stato(controllore.STATO)
-        precedente = stato.get("chat_rino")
-        stato["chat_rino"] = None
-        stato["regalo_aperto_il"] = None
-        controllore.scrivi_stato(controllore.STATO, stato)
+        with serratura.presa(serratura.STATO):
+            stato = controllore.leggi_stato(controllore.STATO)
+            precedente = stato.get("chat_rino")
+            stato["chat_rino"] = None
+            stato["regalo_aperto_il"] = None
+            controllore.scrivi_stato(controllore.STATO, stato)
         print(f"collegamento cancellato (era chat {precedente}). "
               "Il prossimo /start verra' registrato come Rino.")
         return
@@ -176,23 +195,49 @@ def main():
         p.error("scegli --ascolta, --una-volta, --chi oppure --dimentica")
 
     if a.una_volta:
-        stato = controllore.leggi_stato(controllore.STATO)
-        n = processa(stato)
-        controllore.scrivi_stato(controllore.STATO, stato)
+        if serratura.occupata(serratura.ASCOLTO):
+            print("c'e' un ascoltatore in esecuzione: la coda la legge lui.")
+            return
+        with serratura.presa(serratura.STATO):
+            stato = controllore.leggi_stato(controllore.STATO)
+            n = processa(stato)
+            controllore.scrivi_stato(controllore.STATO, stato)
         print(f"messaggi elaborati, nuovi collegamenti: {n}")
         return
+
+    # Un solo ascoltatore alla volta: due getUpdates sullo stesso token si
+    # rubano la coda a vicenda e Telegram ne rifiuta uno con un 409.
+    mia = serratura.prendi_a_vita(serratura.ASCOLTO)
+    if mia is None:
+        print("c'e' gia' un ascoltatore in esecuzione: non ne parte un secondo.")
+        raise SystemExit(1)
 
     print("in ascolto sul bot. Ctrl-C per fermare.")
     try:
         while True:
-            stato = controllore.leggi_stato(controllore.STATO)
+            # L'attesa lunga sta fuori dalla serratura: tenerla per cinquanta
+            # secondi bloccherebbe il giro da cron.
+            offset = controllore.leggi_stato(controllore.STATO).get("tg_offset", 0)
             try:
-                n = processa(stato, attesa=50)
-                if n:
-                    print(f"nuovo collegamento registrato (chat {stato.get('chat_rino')})")
+                aggiornamenti = scarica(offset, attesa=50)
             except notifiche.ErroreInvio as e:
-                print(f"errore: {e}")
-            controllore.scrivi_stato(controllore.STATO, stato)
+                # Senza pausa, con la rete giu' si ripartirebbe subito in un
+                # ciclo stretto che allaga il log e martella Telegram.
+                print(f"{_adesso()} errore in lettura: {e}")
+                time.sleep(5)
+                continue
+            if not aggiornamenti:
+                continue
+            with serratura.presa(serratura.STATO):
+                stato = controllore.leggi_stato(controllore.STATO)
+                try:
+                    n = applica(aggiornamenti, stato)
+                    if n:
+                        print(f"{_adesso()} nuovo collegamento registrato "
+                              f"(chat {stato.get('chat_rino')})")
+                except notifiche.ErroreInvio as e:
+                    print(f"{_adesso()} errore in risposta: {e}")
+                controllore.scrivi_stato(controllore.STATO, stato)
     except KeyboardInterrupt:
         print("\nascolto interrotto.")
 

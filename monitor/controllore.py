@@ -32,6 +32,7 @@ from zoneinfo import ZoneInfo
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fonti
 import notifiche
+import serratura
 from fonti import ErroreFonte
 
 QUI = Path(__file__).resolve().parent
@@ -284,6 +285,7 @@ def letture_finte(scenario):
 def controlla(scenario=None, silenzioso=False):
     prova = scenario is not None
     percorso = STATO_PROVA if prova else STATO
+    coda_nostra = False        # vero se la coda del bot l'abbiamo letta noi
     stato = leggi_stato(percorso)
     adesso = datetime.now(ROMA).isoformat(timespec="seconds")
 
@@ -296,13 +298,20 @@ def controlla(scenario=None, silenzioso=False):
     else:
         letture, allarmi = leggi_fonti()
         # Coda del bot: se qualcuno si e' collegato al muretto mentre
-        # l'ascoltatore era spento, non va perso.
-        try:
-            import bot
-            if bot.processa(stato):
-                notifiche.chat_rino_appresa = stato.get("chat_rino")
-        except notifiche.ErroreInvio as e:
-            allarmi.append(f"[telegram] coda del bot non letta: {e}")
+        # l'ascoltatore era spento, non va perso. Se invece l'ascoltatore e'
+        # vivo la coda e' roba sua: due getUpdates sullo stesso token si
+        # rubano i messaggi a vicenda.
+        if serratura.occupata(serratura.ASCOLTO):
+            print("ascoltatore attivo: la coda del bot la legge lui")
+        else:
+            coda_nostra = True
+            try:
+                import bot
+                with serratura.presa(serratura.STATO):
+                    if bot.processa(stato):
+                        notifiche.chat_rino_appresa = stato.get("chat_rino")
+            except notifiche.ErroreInvio as e:
+                allarmi.append(f"[telegram] coda del bot non letta: {e}")
 
     stati, dettagli = valuta(letture)
 
@@ -351,7 +360,7 @@ def controlla(scenario=None, silenzioso=False):
             allarmi.append(f"[telegram] heartbeat non consegnato: {e}")
             print(f"\n>>> heartbeat FALLITO: {e}")
 
-    scrivi_stato(percorso, stato)
+    salva(percorso, stato, campi_del_bot_nostri=coda_nostra)
     if not prova and pubblica_stato_gara(stati, dettagli):
         print(f">>> {PUBBLICO.name} aggiornato: va pubblicato su GitHub Pages")
 
@@ -369,6 +378,27 @@ def controlla(scenario=None, silenzioso=False):
         "dettagli": dettagli, "annunciati_ora": annunciati_ora,
         "allarmi": allarmi, "heartbeat_dovuto": heartbeat_dovuto,
     }
+
+
+# I campi che appartengono all'ascoltatore: li scrive lui, di continuo, mentre
+# noi stiamo interrogando le fonti. Riscriverli con quelli letti mezzo minuto
+# fa vorrebbe dire perdere un collegamento appena arrivato.
+CAMPI_DEL_BOT = ("tg_offset", "chat_rino", "regalo_aperto_il")
+
+
+def salva(percorso, stato, campi_del_bot_nostri=False):
+    """Riscrive stato.json tenendosi i campi del bot cosi' come stanno adesso.
+
+    Con campi_del_bot_nostri la coda l'abbiamo letta noi, perche' l'ascoltatore
+    era spento: in quel caso i valori buoni sono i nostri e non vanno rilette
+    dal file.
+    """
+    with serratura.presa(serratura.STATO):
+        if not campi_del_bot_nostri:
+            fresco = leggi_stato(percorso)
+            for campo in CAMPI_DEL_BOT:
+                stato[campo] = fresco.get(campo, stato.get(campo))
+        scrivi_stato(percorso, stato)
 
 
 def _heartbeat_dovuto(stato):

@@ -9,3 +9,4 @@ monitor/controllore.log
 __pycache__/
 monitor/.env
 monitor/giro.log
+monitor/*.lock
