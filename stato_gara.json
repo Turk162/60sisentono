@@ -1,9 +1,9 @@
 {
-  "data_confermata": false,
-  "data_testo": null,
-  "data_inizio": null,
-  "data_fine": null,
+  "data_confermata": true,
+  "data_testo": "28-30 maggio 2027",
+  "data_inizio": "2027-05-28",
+  "data_fine": "2027-05-30",
   "biglietti_in_vendita": false,
   "bot": "https://t.me/MurettoRinoBot?start=muretto",
-  "aggiornato": "2026-08-22T13:01:45+02:00"
+  "aggiornato": "2026-09-23T18:00:05+02:00"
 }
